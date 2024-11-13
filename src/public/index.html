@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Remover Tags do XML</title>
+  <!-- Adicionando o link do Bootstrap -->
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    /* Estilos adicionais */
+    body {
+      background-color: #f8f9fa;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    .result-message {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #eaf1fa;
+      border-radius: 5px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    .btn-download {
+      margin-top: 15px;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      border-radius: 5px;
+    }
+    .btn-download:hover {
+      background-color: #218838;
+    }
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1 class="text-center mb-4">Remover Tags de Arquivos XML</h1>
+
+    <!-- Formulário para enviar arquivos -->
+    <form id="uploadForm" enctype="multipart/form-data">
+      <div class="form-group">
+        <label for="tagsToRemove">Digite as tags a serem removidas (separadas por vírgula):</label>
+        <input type="text" id="tagsToRemove" name="tagsToRemove" class="form-control" required>
+      </div>
+
+      <div class="form-group">
+        <label for="xmlFiles">Escolha os arquivos XML:</label>
+        <input type="file" id="xmlFiles" name="xmlFiles" class="form-control" multiple required>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block">Enviar Arquivos</button>
+    </form>
+
+    <div id="result" class="result-message" style="display:none;">
+      <!-- Aqui exibiremos o contador e o link para download -->
+    </div>
+  </div>
+
+  <script>
+    // Função para lidar com o envio do formulário
+    document.getElementById('uploadForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      // Criação de um FormData com os arquivos e tags
+      const formData = new FormData();
+      const files = document.getElementById('xmlFiles').files;
+      const tagsToRemove = document.getElementById('tagsToRemove').value;
+
+      for (let i = 0; i < files.length; i++) {
+        formData.append('xmlFiles', files[i]);
+      }
+
+      formData.append('tagsToRemove', tagsToRemove);
+
+      // Envio dos dados para o servidor
+      fetch('/upload', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        // Exibe o número de tags removidas e o botão de download
+        const resultDiv = document.getElementById('result');
+        resultDiv.style.display = 'block';  // Exibe a mensagem de resultado
+        resultDiv.innerHTML = `
+          <p><strong>${data.totalTagsRemovidas} tags foram removidas!</strong></p>
+          <a href="${data.downloadLink}" class="btn-download" download>Baixar arquivos modificados</a>
+        `;
+      })
+      .catch(error => {
+        console.error('Erro:', error);
+      });
+    });
+  </script>
+
+  <!-- Adicionando o script do Bootstrap -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>

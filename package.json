@@ -1,0 +1,16 @@
+{
+  "name": "removerTags",
+  "version": "1.0.0",
+  "description": "Aplicação para remover tags de arquivos XML",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "express": "^4.17.1",
+    "multer": "^1.4.5-lts.1",
+    "xml2js": "^0.4.23",
+    "zip-folder": "^1.0.0"
+  }
+}
