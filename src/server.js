@@ -5,27 +5,23 @@ const path = require('path');
 const archiver = require('archiver');
 const app = express();
 
-// Definindo a pasta temporária onde os arquivos serão salvos
-const tempDir = path.join(__dirname, 'temp_files'); // Garante que a pasta esteja no diretório raiz do projeto
+const tempDir = path.join(__dirname, 'temp_files');
 
-// Função para garantir que a pasta temporária exista
 if (!fs.existsSync(tempDir)) {
-  fs.mkdirSync(tempDir); // Cria a pasta temp_files se não existir
+  fs.mkdirSync(tempDir);
 }
 
-// Configuração do multer para armazenamento temporário
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, tempDir); // Arquivos enviados são salvos na pasta temp_files
+    cb(null, tempDir);
   },
   filename: (req, file, cb) => {
-    cb(null, `${Date.now()}_${file.originalname}`); // Renomeia os arquivos para evitar conflitos
+    cb(null, file.originalname); 
   }
 });
 
 const upload = multer({ storage: storage });
 
-// Função para remover arquivos após 30 minutos
 function removeFilesAfterTimeout() {
   setTimeout(() => {
     fs.readdir(tempDir, (err, files) => {
@@ -39,37 +35,33 @@ function removeFilesAfterTimeout() {
         });
       });
     });
-  }, 30 * 60 * 1000); // 30 minutos em milissegundos
+  }, 30 * 60 * 1000);
 }
 
-// Rota para servir a página HTML principal (/)
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/index.html')); // Serve o arquivo HTML
+  res.sendFile(path.join(__dirname, 'public/remover.html'));
 });
 
-// Rota para o upload dos arquivos XML
 app.post('/upload', upload.array('xmlFiles'), (req, res) => {
-  const tagsToRemove = req.body.tagsToRemove.split(','); // Tags a remover
+  const tagsToRemove = req.body.tagsToRemove.split(',');
   const arquivosModificados = [];
-  const totalTagsRemovidas = 5; // Exemplo de número de tags removidas
+  let totalTagsRemovidas = 0;
   
   req.files.forEach(file => {
-    // Exemplo de modificação simples nos arquivos (remover tags do XML)
     let fileContent = fs.readFileSync(file.path, 'utf-8');
     
-    // Remover as tags desejadas
     tagsToRemove.forEach(tag => {
       const regex = new RegExp(`<${tag}>.*?</${tag}>`, 'g');
-      fileContent = fileContent.replace(regex, ''); // Removendo as tags
+      const matches = fileContent.match(regex) || [];
+      totalTagsRemovidas += matches.length;
+      fileContent = fileContent.replace(regex, '');
     });
 
-    // Salvar o arquivo modificado na pasta temporária (temp_files)
-    const modifiedFilePath = path.join(tempDir, `modified_${file.filename}`);
+    const modifiedFilePath = path.join(tempDir, `${file.originalname}`);
     fs.writeFileSync(modifiedFilePath, fileContent);
-    arquivosModificados.push(modifiedFilePath); // Adiciona o arquivo modificado à lista
+    arquivosModificados.push(modifiedFilePath);
   });
 
-  // Gerar o arquivo ZIP com os arquivos modificados
   const zipFileName = 'arquivos_modificados.zip';
   const zipPath = path.join(tempDir, zipFileName);
   const output = fs.createWriteStream(zipPath);
@@ -77,17 +69,14 @@ app.post('/upload', upload.array('xmlFiles'), (req, res) => {
 
   archive.pipe(output);
 
-  // Adicionar os arquivos modificados ao ZIP
   arquivosModificados.forEach(file => {
     archive.append(fs.createReadStream(file), { name: path.basename(file) });
   });
 
   archive.finalize();
 
-  // Remover os arquivos após 30 minutos
   removeFilesAfterTimeout();
 
-  // Enviar a resposta com o link para download
   output.on('close', () => {
     res.json({
       message: 'Arquivos modificados com sucesso!',
@@ -97,7 +86,6 @@ app.post('/upload', upload.array('xmlFiles'), (req, res) => {
   });
 });
 
-// Rota para servir os arquivos ZIP para download
 app.get('/arquivos_modificados.zip', (req, res) => {
   const zipPath = path.join(tempDir, 'arquivos_modificados.zip');
   res.download(zipPath, 'arquivos_modificados.zip', (err) => {
@@ -107,7 +95,6 @@ app.get('/arquivos_modificados.zip', (req, res) => {
   });
 });
 
-// Iniciar o servidor
 app.listen(3000, () => {
   console.log('Servidor rodando na porta 3000');
 });
