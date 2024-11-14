@@ -3,6 +3,7 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const archiver = require('archiver');
+const { v4: uuidv4 } = require('uuid');
 const app = express();
 
 const tempDir = path.join(__dirname, 'temp_files');
@@ -13,27 +14,29 @@ if (!fs.existsSync(tempDir)) {
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, tempDir);
+    const requestDir = path.join(tempDir, req.requestDir);
+    if (!fs.existsSync(requestDir)) {
+      fs.mkdirSync(requestDir);
+    }
+    cb(null, requestDir);
   },
   filename: (req, file, cb) => {
-    cb(null, file.originalname); 
+    cb(null, file.originalname);
   }
 });
 
 const upload = multer({ storage: storage });
 
-function removeFilesAfterTimeout() {
-  setTimeout(() => {
-    fs.readdir(tempDir, (err, files) => {
-      if (err) throw err;
+app.use((req, res, next) => {
+  req.requestDir = uuidv4();
+  next();
+});
 
-      files.forEach(file => {
-        const filePath = path.join(tempDir, file);
-        fs.unlink(filePath, (err) => {
-          if (err) throw err;
-          console.log(`Arquivo ${file} removido após 30 minutos`);
-        });
-      });
+function removeFilesAfterTimeout(directory) {
+  setTimeout(() => {
+    fs.rm(directory, { recursive: true, force: true }, (err) => {
+      if (err) throw err;
+      console.log(`Diretório ${directory} removido após 30 minutos`);
     });
   }, 30 * 60 * 1000);
 }
@@ -46,10 +49,10 @@ app.post('/upload', upload.array('xmlFiles'), (req, res) => {
   const tagsToRemove = req.body.tagsToRemove.split(',');
   const arquivosModificados = [];
   let totalTagsRemovidas = 0;
-  
+
   req.files.forEach(file => {
     let fileContent = fs.readFileSync(file.path, 'utf-8');
-    
+
     tagsToRemove.forEach(tag => {
       const regex = new RegExp(`<${tag}>.*?</${tag}>`, 'g');
       const matches = fileContent.match(regex) || [];
@@ -57,13 +60,13 @@ app.post('/upload', upload.array('xmlFiles'), (req, res) => {
       fileContent = fileContent.replace(regex, '');
     });
 
-    const modifiedFilePath = path.join(tempDir, `${file.originalname}`);
+    const modifiedFilePath = path.join(tempDir, req.requestDir, `${file.originalname}`);
     fs.writeFileSync(modifiedFilePath, fileContent);
     arquivosModificados.push(modifiedFilePath);
   });
 
   const zipFileName = 'arquivos_modificados.zip';
-  const zipPath = path.join(tempDir, zipFileName);
+  const zipPath = path.join(tempDir, req.requestDir, zipFileName);
   const output = fs.createWriteStream(zipPath);
   const archive = archiver('zip', { zlib: { level: 9 } });
 
@@ -75,19 +78,19 @@ app.post('/upload', upload.array('xmlFiles'), (req, res) => {
 
   archive.finalize();
 
-  removeFilesAfterTimeout();
+  removeFilesAfterTimeout(path.join(tempDir, req.requestDir));
 
   output.on('close', () => {
     res.json({
       message: 'Arquivos modificados com sucesso!',
       totalTagsRemovidas: totalTagsRemovidas,
-      downloadLink: `http://localhost:3000/arquivos_modificados.zip`
+      downloadLink: `http://localhost:3000/temp_files/${req.requestDir}/arquivos_modificados.zip`
     });
   });
 });
 
-app.get('/arquivos_modificados.zip', (req, res) => {
-  const zipPath = path.join(tempDir, 'arquivos_modificados.zip');
+app.get('/temp_files/:requestDir/arquivos_modificados.zip', (req, res) => {
+  const zipPath = path.join(tempDir, req.params.requestDir, 'arquivos_modificados.zip');
   res.download(zipPath, 'arquivos_modificados.zip', (err) => {
     if (err) {
       console.error('Erro ao baixar o arquivo:', err);
