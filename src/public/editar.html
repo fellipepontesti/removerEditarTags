@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Editar Tags do XML</title>
+  <!-- Link do Bootstrap -->
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f8f9fa;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    .result-message {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #eaf1fa;
+      border-radius: 5px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    .btn-download {
+      margin-top: 15px;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      border-radius: 5px;
+    }
+    .btn-download:hover {
+      background-color: #218838;
+    }
+    .tag-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .delete-btn {
+      color: red;
+      cursor: pointer;
+      font-size: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1 class="text-center mb-4">Editar Tags de Arquivos XML</h1>
+
+    <!-- Formulário para enviar arquivos -->
+    <form id="uploadForm" enctype="multipart/form-data">
+      <div id="tagInputsContainer">
+        <div class="tag-row">
+          <input type="text" placeholder="Tag atual" name="oldTag" class="form-control" required>
+          <input type="text" placeholder="Nova tag" name="newTag" class="form-control" required>
+          <span class="delete-btn">&times;</span>
+        </div>
+      </div>
+
+      <button type="button" class="btn btn-secondary" id="addTagBtn">Adicionar Tag</button>
+
+      <div class="form-group mt-3">
+        <label for="xmlFiles">Escolha os arquivos XML:</label>
+        <input type="file" id="xmlFiles" name="xmlFiles" class="form-control" multiple required>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block">Enviar Arquivos</button>
+    </form>
+
+    <div id="result" class="result-message" style="display:none;">
+      <!-- Exibiremos o número de tags renomeadas e o link para download aqui -->
+    </div>
+  </div>
+
+  <script>
+    // Função para adicionar um novo par de inputs para tags
+    const tagInputsContainer = document.getElementById('tagInputsContainer');
+    const addTagBtn = document.getElementById('addTagBtn');
+
+    addTagBtn.addEventListener('click', () => {
+      const tagRow = document.createElement('div');
+      tagRow.classList.add('tag-row');
+      tagRow.innerHTML = `
+        <input type="text" placeholder="Tag atual" name="oldTag" class="form-control" required>
+        <input type="text" placeholder="Nova tag" name="newTag" class="form-control" required>
+        <span class="delete-btn">&times;</span>
+      `;
+      tagInputsContainer.appendChild(tagRow);
+    });
+
+    // Remover linha de inputs ao clicar na lixeira
+    tagInputsContainer.addEventListener('click', (e) => {
+      if (e.target.classList.contains('delete-btn')) {
+        e.target.parentElement.remove();
+      }
+    });
+
+    // Função para lidar com o envio do formulário
+    document.getElementById('uploadForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const tagPairs = [];
+      document.querySelectorAll('.tag-row').forEach(row => {
+        const oldTag = row.querySelector('input[name="oldTag"]').value;
+        const newTag = row.querySelector('input[name="newTag"]').value;
+        tagPairs.push({ oldTag, newTag });
+      });
+
+      const formData = new FormData();
+      const files = document.getElementById('xmlFiles').files;
+
+      for (let i = 0; i < files.length; i++) {
+        formData.append('xmlFiles', files[i]);
+      }
+      formData.append('tagPairs', JSON.stringify(tagPairs));
+
+      // Enviar os dados para a rota /upload/editar
+      fetch('/upload/editar', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        // Exibe o número de tags renomeadas e o botão de download
+        const resultDiv = document.getElementById('result');
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `
+          <p><strong>${data.totalTagsRenomeadas} tags foram renomeadas!</strong></p>
+          <a href="${data.downloadLink}" class="btn-download" download>Baixar arquivos modificados</a>
+        `;
+      })
+      .catch(error => {
+        console.error('Erro:', error);
+      });
+    });
+  </script>
+
+  <!-- Script do Bootstrap -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>

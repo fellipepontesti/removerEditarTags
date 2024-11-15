@@ -41,11 +41,19 @@ function removeFilesAfterTimeout(directory) {
   }, 30 * 60 * 1000);
 }
 
-app.get('/', (req, res) => {
+app.get('/remover', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/remover.html'));
 });
 
-app.post('/upload', upload.array('xmlFiles'), (req, res) => {
+app.get('/editar', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/editar.html'));
+});
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/index.html'));
+});
+
+app.post('/upload/remover', upload.array('xmlFiles'), (req, res) => {
   const tagsToRemove = req.body.tagsToRemove.split(',');
   const arquivosModificados = [];
   let totalTagsRemovidas = 0;
@@ -88,6 +96,48 @@ app.post('/upload', upload.array('xmlFiles'), (req, res) => {
     });
   });
 });
+
+app.post('/upload/editar', upload.array('xmlFiles'), (req, res) => {
+  const tagPairs = JSON.parse(req.body.tagPairs); // Pares de tags antigas e novas
+  const arquivosModificados = [];
+  let totalTagsRenomeadas = 0;
+
+  req.files.forEach(file => {
+    let fileContent = fs.readFileSync(file.path, 'utf-8');
+
+    // Renomeia as tags de acordo com os pares fornecidos
+    tagPairs.forEach(({ oldTag, newTag }) => {
+      const regex = new RegExp(`<${oldTag}>(.*?)</${oldTag}>`, 'g');
+      const occurrences = (fileContent.match(regex) || []).length;
+      fileContent = fileContent.replace(regex, `<${newTag}>$1</${newTag}>`);
+      totalTagsRenomeadas += occurrences;
+    });
+
+    const modifiedFilePath = path.join(tempDir, file.filename);
+    fs.writeFileSync(modifiedFilePath, fileContent);
+    arquivosModificados.push(modifiedFilePath);
+  });
+
+  const zipFileName = 'arquivos_editados.zip';
+  const zipPath = path.join(tempDir, zipFileName);
+  const output = fs.createWriteStream(zipPath);
+  const archive = archiver('zip', { zlib: { level: 9 } });
+
+  archive.pipe(output);
+  arquivosModificados.forEach(file => {
+    archive.append(fs.createReadStream(file), { name: path.basename(file) });
+  });
+  archive.finalize();
+
+  output.on('close', () => {
+    res.json({
+      message: 'Arquivos editados com sucesso!',
+      totalTagsRenomeadas: totalTagsRenomeadas,
+      downloadLink: `http://localhost:3000/${zipFileName}`
+    });
+  });
+});
+
 
 app.get('/temp_files/:requestDir/arquivos_modificados.zip', (req, res) => {
   const zipPath = path.join(tempDir, req.params.requestDir, 'arquivos_modificados.zip');

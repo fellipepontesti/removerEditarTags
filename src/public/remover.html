@@ -86,7 +86,7 @@
       formData.append('tagsToRemove', tagsToRemove);
 
       // Envio dos dados para o servidor
-      fetch('/upload', {
+      fetch('/upload/remover', {
         method: 'POST',
         body: formData
       })
@@ -102,7 +102,48 @@
       })
       .catch(error => {
         console.error('Erro:', error);
+      })
+
+      app.post('/upload/editar', upload.array('xmlFiles'), (req, res) => {
+        const tagPairs = JSON.parse(req.body.tagPairs);
+        const arquivosModificados = [];
+        let totalTagsRenomeadas = 0;
+
+        req.files.forEach(file => {
+          let fileContent = fs.readFileSync(file.path, 'utf-8');
+
+          tagPairs.forEach(({ oldTag, newTag }) => {
+            const regex = new RegExp(`<${oldTag}>(.*?)</${oldTag}>`, 'g');
+            const occurrences = (fileContent.match(regex) || []).length;
+            fileContent = fileContent.replace(regex, `<${newTag}>$1</${newTag}>`);
+            totalTagsRenomeadas += occurrences;
+          });
+
+          const modifiedFilePath = path.join(tempDir, file.filename);
+          fs.writeFileSync(modifiedFilePath, fileContent);
+          arquivosModificados.push(modifiedFilePath);
+        });
+
+        const zipFileName = 'arquivos_editados.zip';
+        const zipPath = path.join(tempDir, zipFileName);
+        const output = fs.createWriteStream(zipPath);
+        const archive = archiver('zip', { zlib: { level: 9 } });
+
+        archive.pipe(output);
+        arquivosModificados.forEach(file => {
+          archive.append(fs.createReadStream(file), { name: path.basename(file) });
+        });
+        archive.finalize();
+
+        output.on('close', () => {
+          res.json({
+            message: 'Arquivos editados com sucesso!',
+            totalTagsRenomeadas: totalTagsRenomeadas,
+            downloadLink: `http://localhost:3000/${zipFileName}`
+          });
+        });
       });
+
     });
   </script>
 
